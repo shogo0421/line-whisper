@@ -46,7 +46,7 @@ def lambda_handler(event, context):
     return okResponse
 
 
-@handler.add(MessageEvent, message=[AudioMessage, FileMessage, VideoMessage])
+@handler.add(MessageEvent, message=(AudioMessage, FileMessage, VideoMessage))
 def handle_audio_message(line_event):
     message_content = line_bot_api.get_message_content(line_event.message.id)
     extension = mimeTypeToExtension[message_content.content_type]
@@ -57,6 +57,14 @@ def handle_audio_message(line_event):
                 fd.write(chunk)
         audio_file = open(tmp_file, "rb")
         transcript = openai.Audio.transcribe("whisper-1", audio_file)
+    completion = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": """渡された文章に見出しをつけたり、箇条書きにして議事録を作成して下さい"""},
+            {"role": "user", "content": transcript.text},
+        ],
+    )
+    gpt_response_text = completion.choices[0].message.content
     line_bot_api.reply_message(
-        line_event.reply_token, TextSendMessage(text=transcript.text)
+        line_event.reply_token, TextSendMessage(text=gpt_response_text)
     )
